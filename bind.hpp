@@ -4,7 +4,6 @@
 
 namespace my
 {
-
   namespace placeholders
   {
     template <unsigned n>
@@ -23,7 +22,10 @@ namespace my
   namespace detail
   {
     template <unsigned... Ns>
-    struct sequence{};
+    struct sequence
+    {
+      using type = sequence;
+    };
 
     template <unsigned N, unsigned... Rest>
     struct ascending_sequence: ascending_sequence<N - 1, N - 1, Rest...>{};
@@ -48,18 +50,18 @@ namespace my
     template <class... T1, class T2, class... T3, class TupleArgs>
     constexpr auto merge_tuples_imp(const std::tuple<T1...>& d2, const TupleArgs& tuple_args, const T2& head, const T3&... rest)
     {
-      const auto concated = std::tuple_cat(d2, std::make_tuple(head));
+      const auto concatenated = std::tuple_cat(d2, std::make_tuple(head));
 
-      return merge_tuples_imp(concated, tuple_args, rest...);
+      return merge_tuples_imp(concatenated, tuple_args, rest...);
     }
 
     template <class... T1, unsigned N, class... T2, class TupleArgs>
     constexpr auto merge_tuples_imp(const std::tuple<T1...>& d2, const TupleArgs& tuple_args, placeholders::index<N> head, const T2&... rest)
     {
       const unsigned index = N - 1;
-      const auto concated = std::tuple_cat(d2, std::make_tuple(std::get<index>(tuple_args)));
+      const auto concatenated = std::tuple_cat(d2, std::make_tuple(std::get<index>(tuple_args)));
 
-      return merge_tuples_imp(concated, tuple_args, rest...);
+      return merge_tuples_imp(concatenated, tuple_args, rest...);
     }
 
     template <class... T, class TupleArgs>
@@ -68,8 +70,9 @@ namespace my
       return d2;
     }
 
+    // wrapping functions
     template <class... T1, class TupleArgs, unsigned... Ns>
-    constexpr auto merge_tuples_imp(const std::tuple<T1...>& d1, const TupleArgs& tuple_args, sequence<Ns...>)
+    constexpr auto merge_tuples_sequenced(const std::tuple<T1...>& d1, const TupleArgs& tuple_args, sequence<Ns...>)
     {
       return merge_tuples_imp(std::tuple<>{}, tuple_args, std::get<Ns>(d1)...);
     }
@@ -77,7 +80,7 @@ namespace my
     template <class... T1, class TupleArgs>
     constexpr auto merge_tuples(const std::tuple<T1...>& d1, const TupleArgs& tuple_args)
     {
-      return merge_tuples_imp(d1, tuple_args, typename ascending_sequence<sizeof...(T1)>::type{});
+      return merge_tuples_sequenced(d1, tuple_args, typename ascending_sequence<sizeof...(T1)>::type{});
     }
 
     template <class F, class... Args, unsigned... Ns>
@@ -86,6 +89,7 @@ namespace my
       return f(std::get<Ns>(tuple)...);
     }
 
+    // calls function with arguments holded in a tuple
     template <class F, class... Args>
     constexpr auto call_function_with_tupled_arguments(F f, const std::tuple<Args...>& tuple)
     {
@@ -95,29 +99,29 @@ namespace my
     template <class F, class... Args>
     class bind_t
     {
-      std::tuple<Args...> args;
+      std::tuple<Args...> args_with_placeholders;
       F f;
     public:
       constexpr bind_t(F f, Args... args):
-        f(f), args(std::make_tuple(args...))
+        f(f), args_with_placeholders(std::make_tuple(args...))
       {
       }
 
       template <class... NewArgs>
       constexpr auto operator()(NewArgs... newargs)
       {
-        const std::tuple<NewArgs...> tuple_args = std::make_tuple(newargs...);
+        const auto args_to_be_substituted = std::make_tuple(newargs...);
+        const auto merged_args = merge_tuples(args_with_placeholders, args_to_be_substituted);
 
-        const auto merged_tuple = merge_tuples(args, tuple_args);
-        return call_function_with_tupled_arguments(f, merged_tuple);
+        return call_function_with_tupled_arguments(f, merged_args);
       }
     };
   }
 
-template <class F, class... Args>
-auto bind(F f, Args... args)
-{
-  return detail::bind_t<F, Args...>(f, args...);
-}
+  template <class F, class... Args>
+  auto bind(F f, Args... args)
+  {
+    return detail::bind_t<F, Args...>(f, args...);
+  }
 
 }
