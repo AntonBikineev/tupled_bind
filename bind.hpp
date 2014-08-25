@@ -96,6 +96,12 @@ namespace my
       return call_function_with_tupled_arguments_imp(f, tuple, typename ascending_sequence<sizeof...(Args)>::type{});
     }
 
+    template <class R, class Class, class... Args>
+    auto member_functor(R (Class::*f)(Args...), Class* self)
+    {
+      return [=](Args... args){ (self->*f)(args...); };
+    }
+
     template <class F, class... Args>
     class bind_t
     {
@@ -122,6 +128,12 @@ namespace my
   auto bind(F f, Args... args)
   {
     return detail::bind_t<F, Args...>(f, args...);
+  }
+
+  template <class R, class Class, class... Args, class... ArgsWithPlaceholders>
+  auto bind(R (Class::*f)(Args...), Class* self, ArgsWithPlaceholders... args)
+  {
+    return bind(detail::member_functor(f, self), args...);
   }
 
 }
