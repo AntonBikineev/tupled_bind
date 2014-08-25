@@ -34,12 +34,17 @@ namespace my
       using type = sequence<Rest...>;
     };
 
-    template <class... T, class TupleArgs>
-    constexpr auto merge_tuples_imp(const std::tuple<T...>& d2, const TupleArgs& tuple_args)
-    {
-      return d2;
-    }
+    // forward declarations for correct lookup
+    template <class... T1, class T2, class... T3, class TupleArgs>
+    constexpr auto merge_tuples_imp(const std::tuple<T1...>& d2, const TupleArgs& tuple_args, const T2& head, const T3&... rest);
 
+    template <class... T1, unsigned N, class... T2, class TupleArgs>
+    constexpr auto merge_tuples_imp(const std::tuple<T1...>& d2, const TupleArgs& tuple_args, placeholders::index<N> head, const T2&... rest);
+
+    template <class... T, class TupleArgs>
+    constexpr auto merge_tuples_imp(const std::tuple<T...>& d2, const TupleArgs& tuple_args);
+
+    // definitions
     template <class... T1, class T2, class... T3, class TupleArgs>
     constexpr auto merge_tuples_imp(const std::tuple<T1...>& d2, const TupleArgs& tuple_args, const T2& head, const T3&... rest)
     {
@@ -57,6 +62,12 @@ namespace my
       return merge_tuples_imp(concated, tuple_args, rest...);
     }
 
+    template <class... T, class TupleArgs>
+    constexpr auto merge_tuples_imp(const std::tuple<T...>& d2, const TupleArgs& tuple_args)
+    {
+      return d2;
+    }
+
     template <class... T1, class TupleArgs, unsigned... Ns>
     constexpr auto merge_tuples_imp(const std::tuple<T1...>& d1, const TupleArgs& tuple_args, sequence<Ns...>)
     {
@@ -70,13 +81,13 @@ namespace my
     }
 
     template <class F, class... Args, unsigned... Ns>
-    auto call_function_with_tupled_arguments_imp(F f, const std::tuple<Args...>& tuple, sequence<Ns...>)
+    constexpr auto call_function_with_tupled_arguments_imp(F f, const std::tuple<Args...>& tuple, sequence<Ns...>)
     {
       return f(std::get<Ns>(tuple)...);
     }
 
     template <class F, class... Args>
-    auto call_function_with_tupled_arguments(F f, const std::tuple<Args...>& tuple)
+    constexpr auto call_function_with_tupled_arguments(F f, const std::tuple<Args...>& tuple)
     {
       return call_function_with_tupled_arguments_imp(f, tuple, typename ascending_sequence<sizeof...(Args)>::type{});
     }
@@ -87,13 +98,13 @@ namespace my
       std::tuple<Args...> args;
       F f;
     public:
-      bind_t(F f, Args... args):
+      constexpr bind_t(F f, Args... args):
         f(f), args(std::make_tuple(args...))
       {
       }
 
       template <class... NewArgs>
-      auto operator()(NewArgs... newargs)
+      constexpr auto operator()(NewArgs... newargs)
       {
         const std::tuple<NewArgs...> tuple_args = std::make_tuple(newargs...);
 
